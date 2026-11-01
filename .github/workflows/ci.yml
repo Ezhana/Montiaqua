@@ -31,15 +31,18 @@ jobs:
 
       # 刻意不使用 actions/setup-node：ubuntu-latest 预装的 Node 足够跑 Nx，
       # 用预装版本意味着模板不锁 Node 版本，具体版本由项目自己的配置声明。
-      - name: Install Nx (unpinned)
-        # 不指定版本号是刻意的：模板不承诺任何 Nx 版本，
-        # 安装当下最新稳定版即可，由下面的版本打印保证可追溯。
-        run: npm install --global nx --no-fund --no-audit
+      # 模板根目录刻意没有 package.json / lockfile（见 README 的设计说明），
+      # 而 Nx 24 起需要工作区里有本地 Nx 模块，所以这里只为本次 CI 临时装一份：
+      # 不写进仓库、不固定版本，由下面的版本打印保证可追溯。
+      - name: Install Nx (unpinned, ephemeral)
+        run: |
+          npm init --yes > /dev/null
+          npm install nx --no-fund --no-audit
 
       - name: Print Nx version
-        run: nx --version
+        run: npx nx --version
 
       - name: Run affected targets
-        # 只跑受影响项目，避免每次 PR 全量跑。当前仓库没有项目时这里没有任何任务可跑，
-        # affected 会正常退出（绿灯），属于预期行为，不是配置错误。
-        run: nx affected -t lint test build --parallel=3
+        # 只跑受影响项目，避免每次 PR 全量跑。当前模板没有项目时这里会输出
+        # "No tasks were run" 并正常退出；加入第一个项目后同一条命令开始真正工作。
+        run: npx nx affected -t lint test build --parallel=3
