@@ -1,0 +1,45 @@
+# 占位 workflow：仓库当前还没有任何项目，affected 找不到任何任务是 no-op 绿灯，
+# 这是刻意的——模板仓库刚克隆出来时 CI 就应该是绿的，加入第一个项目后同一条流水线
+# 会自动开始真正执行 lint / test / build，不需要再改这个文件。
+#
+# 这里刻意不锁定任何工具版本：不 setup-node 指定 Node 版本，也不写 nx 版本号。
+# 理由同上——模板不应该替使用者做技术选型，也不该逼使用者频繁升版；
+# 实际版本由 runner 预装环境与安装时的最新稳定版决定，并打印到日志里以便追溯。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新推送会取消旧运行，避免过期的 CI 结果占用 runner 和排队时间
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  affected:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # affected 要拿当前 commit 和 base 分支比差异，浅克隆里找不到基准 commit
+          # 就会退化成全量对比，因此必须拉完整历史。
+          fetch-depth: 0
+
+      # 刻意不使用 actions/setup-node：ubuntu-latest 预装的 Node 足够跑 Nx，
+      # 用预装版本意味着模板不锁 Node 版本，具体版本由项目自己的配置声明。
+      - name: Install Nx (unpinned)
+        # 不指定版本号是刻意的：模板不承诺任何 Nx 版本，
+        # 安装当下最新稳定版即可，由下面的版本打印保证可追溯。
+        run: npm install --global nx --no-fund --no-audit
+
+      - name: Print Nx version
+        run: nx --version
+
+      - name: Run affected targets
+        # 只跑受影响项目，避免每次 PR 全量跑。当前仓库没有项目时这里没有任何任务可跑，
+        # affected 会正常退出（绿灯），属于预期行为，不是配置错误。
+        run: nx affected -t lint test build --parallel=3

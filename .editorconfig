@@ -1,0 +1,30 @@
+# 根 editorconfig：只定义跨语言的基线，不替任何语言决定格式风格。
+# 各语言的具体风格交给各语言自己的 formatter（prettier / spotless / ruff / gofmt 等），
+# 这样将来新增技术栈时不用回头改根配置，也避免根规则和 formatter 互相打架。
+root = true
+
+# 所有文件的通用基线：统一 UTF-8 + LF + 末尾换行，避免跨平台 diff 噪声
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# JVM 生态与 Python / protobuf / Gradle 的通行缩进是 4 空格，
+# 与上面 2 空格的默认值分歧在这里一次性声明，各项目就不必重复配置。
+[*.{java,kt,scala,py,proto,gradle}]
+indent_size = 4
+
+# Go 官方格式（gofmt / goimports）强制使用 tab，这里跟随语言规范而不是反着来。
+[*.go]
+indent_style = tab
+
+# Makefile 的缩进有语法含义，必须是 tab，空格会导致配方不被执行。
+[Makefile]
+indent_style = tab
+
+# Markdown 行尾两个空格是硬换行，裁掉会改变渲染结果，因此不 trim。
+[*.md]
+trim_trailing_whitespace = false

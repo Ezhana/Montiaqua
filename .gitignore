@@ -1,0 +1,75 @@
+# 按"各技术栈会产生的产物"分节，而不是按当前已有目录分节：
+# 模板仓库一开始是空的，后续加项目时只需往对应小节追加，不必重排整个文件。
+# 这里不使用 `*` 这类危险通配，避免误伤源码。
+
+# ---------- OS / 编辑器 ----------
+# 系统与 IDE 的本地状态，与项目无关，任何人都不应提交
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# ---------- 环境变量与密钥 ----------
+# 真实密钥只放在本地或 CI secret；模板只提交示例文件，
+# 所以用 ! 例外把 .env.example 保住（例外必须写在忽略规则之后才生效）
+.env
+.env.*
+!.env.example
+
+# ---------- Nx / Node ----------
+# Nx 的本地缓存、计算产物和 affected 基准信息都属于可重建的本地状态
+node_modules/
+.nx/
+dist/
+tmp/
+coverage/
+out/
+*.tsbuildinfo
+.pnpm-store/
+.turbo/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+
+# ---------- JVM (Gradle / Kotlin / Maven) ----------
+# Gradle 依赖缓存、Maven target 输出、Kotlin 编译器缓存都不可提交
+.gradle/
+target/
+*.class
+*.hprof
+.kotlin/
+
+# ---------- Go / Rust ----------
+# Go 测试二进制的默认后缀是 .test；Rust 的构建输出是 target/。
+# 注意 target/、bin/、build/ 这类模式会跨层级匹配，这是有意的：
+# 无论产物在第几层，都是产物。Cargo.lock 不在这里忽略，见文件末尾说明。
+*.test
+bin/
+target/
+
+# ---------- 移动端 ----------
+# iOS 的依赖与派生数据、Flutter / Dart 的构建缓存和插件注册文件
+Pods/
+DerivedData/
+*.xcuserstate
+.dart_tool/
+.flutter-plugins*
+build/
+
+# ---------- 必须提交、刻意不忽略的文件 ----------
+# 下面这些不是产物，而是保证构建可复现的锁文件 / 包装器，模板明确要求提交：
+#   pnpm-lock.yaml、uv.lock、poetry.lock —— 依赖锁
+#   gradle/wrapper/gradle-wrapper.jar —— Gradle Wrapper 的一部分
+# 所以本文件不为它们写任何忽略规则。
+# 同理，deploy/ 下的环境清单模板属于需要提交的部署描述，
+# 不能因为全局的 build/、target/、bin/ 模式而顺手把 deploy/ 整个忽略掉。
