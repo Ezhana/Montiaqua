@@ -8,7 +8,7 @@
 - 某个客户端专属的边缘层：`clients/bff-gateway`
 - 客户端之间显式抽出的共享 library：`clients/web-shared-ui`
 
-后端服务、部署编排、跨语言契约都不在这里：分别在 `services/`、`deploy/`、`services/contracts`。
+后端服务、环境编排、跨语言契约都不在这里：分别在 `services/`、`infra/` 与 `deploy/`、`services/contracts`。
 
 ## 命名与结构
 
@@ -55,5 +55,6 @@ target 名沿用 `lint`、`test`、`build`、`e2e`、`typecheck`、`serve`：`nx
 ## 与相邻目录的关系
 
 - `services/` 提供后端与契约；客户端消费 `services/contracts` 经 `tools/gen-api` 生成的代码。
-- `deploy/` 消费 Nx 构建产物；`bff-*` 的部署形态接近服务，归属仍是某个客户端。
-- CI 入口是 `.github/workflows/ci.yml`，用 `nx affected` 跑受影响的项目。
+- `infra/` 在本地用 compose 直接 build 当前代码起客户端与依赖，端口直通到宿主机。
+- `deploy/` 只消费镜像化的构建产物；`bff-*` 的部署形态接近服务，归属仍是某个客户端。
+- CI 入口是 `.github/workflows/ci.yml`，用 `nx affected` 跑受影响的项目，并检查 `deploy/` 的层规则。

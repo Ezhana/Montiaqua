@@ -37,4 +37,4 @@ tools/
 
 - `services/contracts` 是 `gen-api` 的输入
 - `clients/` 与 `services/` 消费生成的代码
-- `deploy/` 消费 Nx 构建产物；CI 入口在 `.github/workflows/ci.yml`
+- `infra/` 在本地拉起依赖与服务；`deploy/` 只消费镜像化产物，CI 入口在 `.github/workflows/ci.yml`

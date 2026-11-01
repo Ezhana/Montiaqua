@@ -71,5 +71,5 @@ build/
 #   pnpm-lock.yaml、uv.lock、poetry.lock —— 依赖锁
 #   gradle/wrapper/gradle-wrapper.jar —— Gradle Wrapper 的一部分
 # 所以本文件不为它们写任何忽略规则。
-# 同理，deploy/ 下的环境清单模板属于需要提交的部署描述，
-# 不能因为全局的 build/、target/、bin/ 模式而顺手把 deploy/ 整个忽略掉。
+# 同理，infra/ 与 deploy/ 下的本地编排、弱密钥模板和部署清单属于需要提交的描述文件，
+# 不能因为全局的 build/、target/、bin/ 模式而顺手把这两层整个忽略掉。

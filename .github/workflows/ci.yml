@@ -5,6 +5,9 @@
 # 这里刻意不锁定任何工具版本：不 setup-node 指定 Node 版本，也不写 nx 版本号。
 # 理由同上——模板不应该替使用者做技术选型，也不该逼使用者频繁升版；
 # 实际版本由 runner 预装环境与安装时的最新稳定版决定，并打印到日志里以便追溯。
+#
+# 除 affected 外还有一个 env-layers job：固定 infra/ 与 deploy/ 的分层规则
+# （见 docs/adr/0001-infra-vs-deploy.md）——deploy/ 只引用 image:，不 build、不放 Dockerfile。
 name: CI
 
 on:
@@ -46,3 +49,27 @@ jobs:
         # 只跑受影响项目，避免每次 PR 全量跑。当前模板没有项目时这里会输出
         # "No tasks were run" 并正常退出；加入第一个项目后同一条命令开始真正工作。
         run: npx nx affected -t lint test build --parallel=3
+
+  env-layers:
+    # 固定 infra/ 与 deploy/ 的分层规则：deploy/ 只引用 image:，不 build、不放 Dockerfile；
+    # 本地构建、弱密钥、端口直通与 seed 数据属于 infra/（见 infra/README.md）。
+    # 这条检查只读文件、不依赖 Nx，因此和上面的 affected 流水线并行跑。
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: deploy/ must stay image-only
+        run: |
+          set -euo pipefail
+          offenders=$(grep -RInE --include='*.yaml' --include='*.yml' '^[[:space:]]*build:' deploy/ || true)
+          if [ -n "$offenders" ]; then
+            echo "deploy/ 只能引用 image:，不能出现 build:（本地构建属于 infra/）:" >&2
+            echo "$offenders" >&2
+            exit 1
+          fi
+          if find deploy/ -iname 'Dockerfile*' | grep -q .; then
+            echo "deploy/ 不放 Dockerfile：镜像由项目构建后推到镜像仓库" >&2
+            exit 1
+          fi
+          echo "deploy/ 层规则检查通过"

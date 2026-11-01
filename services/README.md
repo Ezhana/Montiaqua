@@ -8,7 +8,7 @@
 - 跨语言契约：`services/contracts`（OpenAPI / proto / JSON Schema）
 - 服务侧显式抽出的共享 library：`services/java-shared-core`
 
-客户端、部署编排不在这里：分别在 `clients/`、`deploy/`。
+客户端、环境编排不在这里：分别在 `clients/`、`infra/` 与 `deploy/`。
 
 ## 命名与结构
 
@@ -56,5 +56,6 @@ services/
 ## 与相邻目录的关系
 
 - `clients/` 消费契约生成的代码；两边通过契约对接，而不是共享源码。
-- `deploy/` 消费 Nx 构建产物，服务镜像与清单按项目名对应。
+- `infra/` 在本地用 compose 直接 build 服务代码，依赖与端口直通都只对本机生效。
+- `deploy/` 只消费镜像化的构建产物，服务镜像与清单按项目名对应。
 - `tools/` 里的 `gen-api` 以本目录的契约为输入；CI 入口是根 `.github/workflows/ci.yml`。

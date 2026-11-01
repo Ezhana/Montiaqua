@@ -14,6 +14,7 @@ Montiaqua is a GitHub Template Repository for a polyglot monorepo, meant to host
 - **Projects are defined by `project.json`.** Each client, service, and contracts project keeps a `project.json` in its own directory, and Nx discovers it automatically; there is no project list at the root.
 - **Projects bring their own toolchain.** The root has no `package.json`, lockfile, or version file; language, build tool, and versions follow each project's own build files.
 - **Cross-language work goes through contracts.** Interfaces live in `services/contracts` (OpenAPI / proto / JSON Schema); clients and services consume the same contract, and generated code is produced by `tools/gen-api`.
+- **Environments are layered by "run locally every day".** `infra/` serves local development only, `deploy/` serves non-local environments only; the test is whether a local developer runs the file every day.
 - **CI looks only at changes.** `nx affected` keeps CI to affected projects; while the repository has no projects, this pipeline passes as a no-op.
 
 ## Layout
@@ -30,16 +31,19 @@ Montiaqua is a GitHub Template Repository for a polyglot monorepo, meant to host
 │
 ├── clients/README.md             # where web / desktop / mobile / bff go
 ├── services/README.md            # where java-api / python-api / contracts go
-├── deploy/README.md              # where docker-compose / k8s go
+├── infra/README.md               # local dev: compose / weak credentials / ports / seed
+├── deploy/README.md              # non-local: image: manifests / externally injected secrets
 ├── tools/README.md               # where gen-api, boundary checks, etc. go
 │
 ├── docs/
-│   └── adr/README.md             # optional: architecture decision records
+│   └── adr/
+│       ├── README.md             # optional: architecture decision records
+│       └── 0001-infra-vs-deploy.md  # layering rule: local dev vs non-local deploy
 │
-└── .github/workflows/ci.yml      # placeholder: install Nx, then run affected
+└── .github/workflows/ci.yml      # placeholder: install Nx, run affected, check layers
 ```
 
-`clients/`, `services/`, `deploy/`, and `tools/` currently contain only their own READMEs and no subdirectories; `docs/adr/` holds just its README. `docs/adr` is an optional directory; delete it if you don't need it.
+`clients/`, `services/`, `infra/`, `deploy/`, and `tools/` currently contain only their own READMEs and no subdirectories; `docs/adr/` holds its README plus one layering decision. `docs/adr` is still an optional directory; delete it together with that record if you don't need it.
 
 ## Usage
 
@@ -71,9 +75,18 @@ nx run web-portal:build
 
 The directory naming convention is `clients/<platform>-<name>` (web / desktop / mobile / bff) and `services/<language>-<name>` (java / python / go / node …), with contracts fixed at `services/contracts`. Target names follow `lint`, `test`, `build`, `e2e`, `typecheck`, `serve`: `nx.json` configures caching and ordering by these names, `build` runs the `build` of upstream dependencies first, and `serve` is a long-running process that is not cached.
 
-## Deployment
+## Environment layers: infra/ and deploy/
 
-docker-compose, Kubernetes / Helm, environment variable templates, and release scripts live in `deploy/`; see [deploy/README.md](deploy/README.md).
+The repository is split into two layers by environment, and the test is a single question: **will a local developer run this file every day?**
+
+| Directory | Serves | Allowed | Not allowed |
+| --- | --- | --- | --- |
+| `infra/` | local development (localhost) | `build:`, weak credentials, port passthrough, seed data | real secrets, cloud endpoints, release logic |
+| `deploy/` | non-local environments (staging / prod etc.) | `image:`, externally injected secret key names | `build:`, installing dependencies, committed real secrets |
+
+- Local orchestration, weak credentials, and seed data live in `infra/`; see [infra/README.md](infra/README.md). `deploy/` holds only image-based Kubernetes / Helm manifests; see [deploy/README.md](deploy/README.md).
+- The two layers share no files and no variables; a `build:` in `deploy/` YAML is rejected by the CI layer check.
+- When Terraform / cloud resource definitions arrive, put them in `infra/terraform/` (or a standalone `platform/`), never mixed with application manifests in the same layer: local environments have an hourly lifetime, cloud resources a monthly one, with different permission boundaries. Rationale and costs are in [docs/adr/0001-infra-vs-deploy.md](docs/adr/0001-infra-vs-deploy.md).
 
 ## License
 
