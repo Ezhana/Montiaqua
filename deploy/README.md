@@ -15,8 +15,8 @@
 
 ## 硬规则
 
-1. **只用 `image:`。** 每个工作负载引用项目构建并推到镜像仓库的 tag；不写 `build:`、不写 build context、不放 Dockerfile。
-2. **不装依赖。** 不在部署清单或发布脚本里跑 `npm install`、`pip install`、`gradlew`；依赖在项目里，构建产物由 `nx affected -t build` 与镜像构建产出。
+1. **只用 `image:`。** 每个工作负载引用镜像仓库里的 tag，tag 来自 compose 的 `image:` 声明（项目名 + commit）；不写 `build:`、不写 build context、不放 Dockerfile。
+2. **不装依赖、不构建。** 不在部署清单或发布脚本里跑 `npm install`、`pip install`、`gradlew`；镜像由 CI 用 `docker compose build` / `docker compose push` 产出，`deploy/` 只取结果。
 3. **密钥外部注入。** 仓库里只有键名模板（`env/*.example`，值为空或占位符），真实值来自 CI secret 或外部密钥管理（Vault / KMS / k8s Secret）；`.env` 已被 `.gitignore` 忽略。
 4. **按环境分目录。** `k8s/staging`、`k8s/prod`、`env/*.example` 一一对应；差异靠变量注入，不复制粘贴整份清单。
 5. **不服务本机。** 本地 compose、端口直通、seed 数据、弱密钥一律在 `infra/`，`deploy/` 不提供本地入口。
@@ -36,30 +36,41 @@ deploy/
     └── prod.env.example
 ```
 
-按需创建。`docker-compose` 属于本机开发，放 `infra/compose/`，不在这里。
+按需创建。`docker-compose` 属于本机开发，放 `infra/compose/`，不在这里；`deploy/` 也不出现在 compose 的 `services:` 里。
 
-## 消费 Nx 构建产物
+## 消费构建产物
 
-部署前由 CI / 发布流水线构建并推镜像，`deploy/` 只取结果：
+`deploy/` 消费的是 registry 里的镜像。镜像按 `infra/compose/compose.yaml` 里的声明构建：每条带 `image:` 的 service 就是一个待构建、待推送的镜像，CI 全量执行，不做变更筛选：
 
 ```bash
-nx affected -t build --base=origin/main   # 产出构建物
-# 镜像由项目自己的构建 / 发布 target 产出并推送，deploy/ 不参与
+# CI / 发布流水线（不在 deploy/ 里执行）
+docker compose -f infra/compose/compose.yaml build
+docker compose -f infra/compose/compose.yaml push
 ```
 
-产物位置见对应项目 `project.json` 里 `build` target 的 `outputs`；镜像 tag 跟 Nx 项目名与 commit 对应，便于从部署对象反查项目。
+`deploy/` 的清单只引用结果，tag 用项目名 + commit，便于从部署对象反查项目：
+
+```yaml
+# deploy/k8s/prod/java-api.yaml（示意）
+spec:
+  containers:
+    - name: java-api
+      image: ghcr.io/<org>/java-api:<sha>
+```
+
+`deploy/` 不构建、不拉源码、不跑安装命令；环境差异靠注入的变量与镜像 tag 表达。
 
 ## CI
 
-CI 入口是根目录的 `.github/workflows/ci.yml` —— GitHub 只从 `.github/workflows/` 读 workflow，这是平台要求。CI 里的层规则检查会拒绝 `deploy/` 下出现 `build:` 的 YAML 和 Dockerfile；`deploy/` 存放它调用的脚本与流水线片段，两边各司其职。
+CI 入口是根目录的 `.github/workflows/ci.yml` —— GitHub 只从 `.github/workflows/` 读 workflow，这是平台要求。CI 直接调用 `docker compose`，不经过 `justfile` 的别名；其中的层规则检查会拒绝 `deploy/` 下出现 `build:` 的 YAML 和 Dockerfile。`deploy/` 存放它调用的脚本与流水线片段，两边各司其职。
 
 ## 环境
 
-环境分 `staging` / `prod`（以及需要时的共享开发环境），差异通过变量注入：提交的是 `*.example` 模板，真实值来自 CI secret 或外部密钥管理。清单里的资源名、镜像名通常跟着 Nx 项目名走，便于从部署对象反查项目。
+环境分 `staging` / `prod`（以及需要时的共享开发环境），差异通过变量注入：提交的是 `*.example` 模板，真实值来自 CI secret 或外部密钥管理。清单里的资源名、镜像名跟着项目名走，便于从部署对象反查项目。
 
 ## 与相邻目录的关系
 
 - `infra/` 是本机开发层（compose、弱密钥、端口直通、seed），两边不共享文件、不共享变量。
-- `services/` 与 `clients/` 产出被部署的构建物与镜像。
-- `tools/` 提供 `gen-api` 等仓库级脚本。
-- 根 `justfile` 是这些命令的可选短别名。
+- `services/` 与 `clients/` 的源码由 compose 声明成镜像，CI 构建并推 registry，`deploy/` 只消费 `image:`。
+- `tools/` 提供 `gen-api` 等一次性任务镜像，不参与部署。
+- 根 `justfile` 只是给人用的别名层，可删；CI 与 `deploy/` 都不依赖它。

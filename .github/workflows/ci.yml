@@ -1,13 +1,12 @@
-# 占位 workflow：仓库当前还没有任何项目，affected 找不到任何任务是 no-op 绿灯，
-# 这是刻意的——模板仓库刚克隆出来时 CI 就应该是绿的，加入第一个项目后同一条流水线
-# 会自动开始真正执行 lint / test / build，不需要再改这个文件。
+# 占位 workflow：仓库当前还没有服务，compose 里没有可构建的镜像，所以这里只校验
+# compose 文件能解析，并固定 infra/ 与 deploy/ 的分层规则；克隆出来就应该是绿的。
 #
-# 这里刻意不锁定任何工具版本：不 setup-node 指定 Node 版本，也不写 nx 版本号。
-# 理由同上——模板不应该替使用者做技术选型，也不该逼使用者频繁升版；
-# 实际版本由 runner 预装环境与安装时的最新稳定版决定，并打印到日志里以便追溯。
+# 加了第一个服务后流水线职责不变，仍然是构建镜像并推到 registry：
+# 届时在 compose 里给服务声明 image:，CI 加一步 docker compose build / push 即可。
+# CI 直接调用 docker，不经过 justfile 的别名——别名只服务人，不参与流水线。
 #
-# 除 affected 外还有一个 env-layers job：固定 infra/ 与 deploy/ 的分层规则
-# （见 docs/adr/0001-infra-vs-deploy.md）——deploy/ 只引用 image:，不 build、不放 Dockerfile。
+# 除镜像外还有一个 env-layers job：deploy/ 只引用 image:，不 build、不放 Dockerfile
+# （见 docs/adr/0001-infra-vs-deploy.md）。
 name: CI
 
 on:
@@ -22,38 +21,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  affected:
+  compose:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # affected 要拿当前 commit 和 base 分支比差异，浅克隆里找不到基准 commit
-          # 就会退化成全量对比，因此必须拉完整历史。
-          fetch-depth: 0
 
-      # 刻意不使用 actions/setup-node：ubuntu-latest 预装的 Node 足够跑 Nx，
-      # 用预装版本意味着模板不锁 Node 版本，具体版本由项目自己的配置声明。
-      # 模板根目录刻意没有 package.json / lockfile（见 README 的设计说明），
-      # 而 Nx 24 起需要工作区里有本地 Nx 模块，所以这里只为本次 CI 临时装一份：
-      # 不写进仓库、不固定版本，由下面的版本打印保证可追溯。
-      - name: Install Nx (unpinned, ephemeral)
-        run: |
-          npm init --yes > /dev/null
-          npm install nx --no-fund --no-audit
-
-      - name: Print Nx version
-        run: npx nx --version
-
-      - name: Run affected targets
-        # 只跑受影响项目，避免每次 PR 全量跑。当前模板没有项目时这里会输出
-        # "No tasks were run" 并正常退出；加入第一个项目后同一条命令开始真正工作。
-        run: npx nx affected -t lint test build --parallel=3
+      - name: Validate compose file
+        # compose 是本地编排的唯一声明处，先保证它能解析；镜像构建在加服务后接入。
+        # Ubuntu runner 自带 docker compose v2，不需要额外安装。
+        run: docker compose -f infra/compose/compose.yaml config -q
 
   env-layers:
     # 固定 infra/ 与 deploy/ 的分层规则：deploy/ 只引用 image:，不 build、不放 Dockerfile；
     # 本地构建、弱密钥、端口直通与 seed 数据属于 infra/（见 infra/README.md）。
-    # 这条检查只读文件、不依赖 Nx，因此和上面的 affected 流水线并行跑。
+    # 这条检查只读文件、不依赖 docker，因此和上面的 compose 流水线并行跑。
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

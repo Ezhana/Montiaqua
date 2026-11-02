@@ -18,17 +18,15 @@ Thumbs.db
 .env.*
 !.env.example
 
-# ---------- Nx / Node ----------
-# Nx 的本地缓存、计算产物和 affected 基准信息都属于可重建的本地状态
+# ---------- Node / 前端工具链 ----------
+# 依赖目录、构建产物与本地缓存都属于可重建的本地状态
 node_modules/
-.nx/
 dist/
 tmp/
 coverage/
 out/
 *.tsbuildinfo
 .pnpm-store/
-.turbo/
 
 # ---------- Python ----------
 __pycache__/
