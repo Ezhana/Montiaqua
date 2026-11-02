@@ -22,7 +22,3 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-            echo "deploy/ 不放 Dockerfile：镜像由项目构建后推到镜像仓库" >&2
-            exit 1
-          fi
-          echo "deploy/ 层规则检查通过"
