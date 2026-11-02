@@ -11,6 +11,11 @@ Thumbs.db
 .vscode/
 *.iml
 
+# ---------- AI 工具本地状态 ----------
+# 个人设置、会话缓存与本地配置不提交；仓库级约定在 AGENT.md 与 skills/（需要提交）
+.claude/settings.local.json
+.aider*
+
 # ---------- 环境变量与密钥 ----------
 # 真实密钥只放在本地或 CI secret；模板只提交示例文件，
 # 所以用 ! 例外把 .env.example 保住（例外必须写在忽略规则之后才生效）
