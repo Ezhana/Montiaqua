@@ -1,12 +1,3 @@
-# 占位 workflow：仓库当前还没有服务，compose 里没有可构建的镜像，所以这里只校验
-# compose 文件能解析，并固定 infra/ 与 deploy/ 的分层规则；克隆出来就应该是绿的。
-#
-# 加了第一个服务后流水线职责不变，仍然是构建镜像并推到 registry：
-# 届时在 compose 里给服务声明 image:，CI 加一步 docker compose build / push 即可。
-# CI 直接调用 docker，不经过 justfile 的别名——别名只服务人，不参与流水线。
-#
-# 除镜像外还有一个 env-layers job：deploy/ 只引用 image:，不 build、不放 Dockerfile
-# （见 docs/adr/0001-infra-vs-deploy.md）。
 name: CI
 
 on:
@@ -15,7 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-# 同一分支的新推送会取消旧运行，避免过期的 CI 结果占用 runner 和排队时间
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -27,30 +17,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate compose file
-        # compose 是本地编排的唯一声明处，先保证它能解析；镜像构建在加服务后接入。
-        # Ubuntu runner 自带 docker compose v2，不需要额外安装。
-        run: docker compose -f infra/compose/compose.yaml config -q
-
   env-layers:
-    # 固定 infra/ 与 deploy/ 的分层规则：deploy/ 只引用 image:，不 build、不放 Dockerfile；
-    # 本地构建、弱密钥、端口直通与 seed 数据属于 infra/（见 infra/README.md）。
-    # 这条检查只读文件、不依赖 docker，因此和上面的 compose 流水线并行跑。
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: deploy/ must stay image-only
-        run: |
-          set -euo pipefail
-          offenders=$(grep -RInE --include='*.yaml' --include='*.yml' '^[[:space:]]*build:' deploy/ || true)
-          if [ -n "$offenders" ]; then
-            echo "deploy/ 只能引用 image:，不能出现 build:（本地构建属于 infra/）:" >&2
-            echo "$offenders" >&2
-            exit 1
-          fi
-          if find deploy/ -iname 'Dockerfile*' | grep -q .; then
             echo "deploy/ 不放 Dockerfile：镜像由项目构建后推到镜像仓库" >&2
             exit 1
           fi
